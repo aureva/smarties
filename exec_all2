@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#sbatch runfile_exec
+sed -i 's/Re180/Re1e3/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e3/Re2e3/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re2e3/Re5e3/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re5e3/Re1e4/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/Re1e4/Re1e5/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e5/Re1e6/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e6/Re1e7/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e7/Re1e8/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/Re1e8/Re1e9/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e9/Re1e10/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/Re1e10/Re180/g' runfile_exec
+
+

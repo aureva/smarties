@@ -1,0 +1,5 @@
+MPICXX=mpic++
+LD=mpic++
+
+LIBS+= -lopenblas
+CPPFLAGS+= -DUSE_OPENBLAS

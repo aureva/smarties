@@ -1,0 +1,7 @@
+{
+  "learner": "VRACER",
+  "dataSamplingAlgo": "uniform",
+  "returnsEstimator": "retrace",
+  "ERoldSeqFilter": "oldest",
+  "nnLayerSizes": [128, 128]
+}

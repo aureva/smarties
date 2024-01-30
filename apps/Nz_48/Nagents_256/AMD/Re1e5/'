@@ -1,0 +1,27 @@
+#!/bin/bash
+
+#SBATCH -J N161e3
+#SBATCH --ntasks=4
+#SBATCH --time=24:00:00
+#SBATCH --partition=q64,q36,q32,q24
+#SBATCH --exclusive
+
+cd $SLURM_SUBMIT_DIR
+
+module purge
+module load intel
+module load openmpi/intel-2019.0/4.0.3
+#£module load openmpi/gnu/4.0.3
+
+rm -rf output/*.bin
+rm -rf output/*.out
+rm -rf output/*.dat
+rm -rf output/GABLS3DATA
+mkdir output/GABLS3DATA
+#cp input/vel.ini input/vel.out
+#cp input/zo.ini input/zo.out
+
+
+# Run first continuing case
+mpirun -np $SLURM_NTASKS --mca orte_base_help_aggregate 0 LES2 
+

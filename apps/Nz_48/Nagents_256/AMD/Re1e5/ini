@@ -1,0 +1,15 @@
+rm -rf output/*.bin
+rm -rf output/*.out
+rm -rf output/*.dat
+rm -rf output/GABLS3DATA
+mkdir output/GABLS3DATA
+cp input/t.ini input/t.out
+cp input/q.ini input/q.out
+cp input/t_025meters.ini input/t_025meters.out
+cp input/q_025meters.ini input/q_025meters.out
+cp input/t_surf.ini input/t_surf.out
+cp input/q_surf.ini input/q_surf.out
+cp input/coolrate.ini input/coolrate.out
+cp input/qcoolrate.ini input/qcoolrate.out
+cp input/vel.ini input/vel.out
+cp input/zo.ini input/zo.out

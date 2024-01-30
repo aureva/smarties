@@ -1,0 +1,49 @@
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+Using seed 2170618140
+SETUP: State vector has 6 components, 2 of which are observed. Action vector has 1 continuous-valued components.
+Action vector components : [ 0 : bound to (0.9:1.1) ]
+Creating learning algorithm #00
+Settings/Hyperparameters 1000000% minTotSettings/Hyperparameters 1000000% minTot local==========================================================================
+              Continuous-action V-RACER with Gaussian policy              
+==========================================================================
+Experience Replay sampling algorithm: uniform probability.
+Returns estimation method: retrace.
+Experience Replay storage: First In First Out.
+Using ReF-ER with clipping parameter C=4.000000, tolerance D=0.100000 and annealing E=0.000000
+    Single net with outputs: [0] : V(s),
+                             [1 2] : policy mean and stdev,
+    Size per entry = [1 1 1].
+Initializing net approximator.
+Layers composition:
+(0) Input Layer of size:2
+(1) SoftSign Recurrent-InnerProduct Layer of size:128 linked to Layer:0 of size:2
+(2) SoftSign Recurrent-InnerProduct Layer of size:128 linked to Layer:1 of size:128
+(3) Parametric Residual Connection of size:128
+(4) Linear output InnerProduct Layer of size:2 linked to Layer:3 of size:128
+(5) Parameter Layer of size:1. Initialized: -0.111803
+Optimizer: Parameter updates using Adam SGD algorithm.
+Restarting from saved policy...
+Restarting from file /home/aurelien.vadrot/TOOLS/smarties/runs/model3/Nz_48/Nagents_256/AMD/N256/Re1e5/agent_00_net_weights.raw.
+Restarting from file /home/aurelien.vadrot/TOOLS/smarties/runs/model3/Nz_48/Nagents_256/AMD/N256/Re1e5/agent_00_net_tgt_weights.raw.
+Restarting from file /home/aurelien.vadrot/TOOLS/smarties/runs/model3/Nz_48/Nagents_256/AMD/N256/Re1e5/agent_00_net_1stMom.raw.
+Restarting from file /home/aurelien.vadrot/TOOLS/smarties/runs/model3/Nz_48/Nagents_256/AMD/N256/Re1e5/agent_00_net_2ndMom.raw.
+Restarting from saved policy...
+Restarting from file /home/aurelien.vadrot/TOOLS/smarties/runs/model3/Nz_48/Nagents_256/AMD/N256/Re1e5/agent_00_scaling.raw.
+Evaluating the policy: will skip restarting the Replay Buffer from file.
+Collected 0 environment episodes out of 1 to evaluate  restarted policies.

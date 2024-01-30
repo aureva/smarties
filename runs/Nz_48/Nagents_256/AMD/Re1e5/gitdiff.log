@@ -1,0 +1,1102 @@
+diff --git a/apps/cart_pole_f90/Makefile b/apps/cart_pole_f90/Makefile
+index 8251eb1..0222387 100644
+--- a/apps/cart_pole_f90/Makefile
++++ b/apps/cart_pole_f90/Makefile
+@@ -1,48 +1,44 @@
+-F90=mpif90
+-CXX=mpic++
+-
+-F90FLAGS+= -Wall -Wextra -Wconversion -pedantic -O2 #-g -O0
+-LIBS+= -lgfortran -lmpifort
+-
+-#LDFLAGS+= -fopenmp
+-LIBS+= -L${SMARTIES_ROOT}/lib -lsmarties
+-CPPFLAGS+= -std=c++14 -Wall -O2 -I${SMARTIES_ROOT}/include
+-#CPPFLAGS+= -std=c++14 -Wall -g -O0 -I${SMARTIES_ROOT}/include
+-CPPFLAGS+= -Wextra -Wfloat-equal -Wundef -Wcast-align -Wno-unused-parameter
+-CPPFLAGS+= -Wwrite-strings -Wlogical-op -Wmissing-declarations -Wredundant-decls
+-CPPFLAGS+= -Wshadow -Woverloaded-virtual -Wuninitialized -Wno-div-by-zero
+-
+-#.DEFAULT_GOAL := cart_pole
+-
+-.PHONY: all clean
+-
+-all: post-build
+-
+-pre-build:
+-ifeq (,$(wildcard ./smarties.f90))
+-	ln -s $(SMARTIES_ROOT)/include/smarties.f90
+-endif
+-
+-post-build: main-build
+-	@echo "Done."
+-
+-main-build: pre-build
+-	@$(MAKE) --no-print-directory exec
+-
+-
+-exec: main.o app_main.o cart_pole.o smarties.o
+-	$(CXX) $(extra) -o $@ $^ ${LIBS}
+-
+-app_main.o: cart_pole.o smarties.o
+-
+-%.o: %.cpp
+-	$(CXX) $(extra) $(CPPFLAGS) -c $< -o $@
+-
+-%.o: %.f90
+-	$(F90) $(F90FLAGS) -c $< -o $@
+-
+-%.d: %.cpp
+-	$(CXX) $(extra) $(CPPFLAGS) -MD -c $<
+-
+-clean:
+-	rm -f *.o *.s *.d *.mod smarties.f90 exec
++.POSIX:
++.SUFFIXES: .o .cpp .f90
++.PHONY: clean all
++
++PREFIX = $(SMARTIES_ROOT)
++CXXFLAGS = -O2 -g
++FCFLAGS = -O2 -g
++ 
++FC = mpifort
++CXX = mpicxx
++LINK = $(FC)
++
++M_CXXFLAGS = -I$(PREFIX)/include
++M_FCFLAGS = -I$(PREFIX)/include -I.
++MPI_EXTRA_LIB = -lstdc++
++M_LDFLAGS = -L$(PREFIX)/lib -lsmarties -L$(PREFIX)/extern/lib $(MPI_EXTRA_LIB)
++M_CHFLAGS = 
++
++C = \
++cart_pole.o\
++smarties.o\
++
++O = \
++app_main.o\
++main.o\
++smarties_extern.o\
++
++M = \
++app_main\
++
++all: $C $M
++
++$M: $O
++
++.cpp.o:; $(CXX) -c $(CXXFLAGS) $(M_CXXFLAGS) $<
++
++.f90.o:; $(FC) -c $(FCFLAGS) $(M_FCFLAGS) $(M_CHFLAGS) $<
++
++.o:; $(LINK) $C $O $(LDFLAGS) $(M_LDFLAGS) $(M_CHFLAGS) -o $@
++
++
++clean:; rm -f -- $M $O $C *.mod
++
++
+diff --git a/apps/cart_pole_f90/app_main.f90 b/apps/cart_pole_f90/app_main.f90
+index 12c47b6..85b063b 100644
+--- a/apps/cart_pole_f90/app_main.f90
++++ b/apps/cart_pole_f90/app_main.f90
+@@ -75,7 +75,7 @@ contains
+ 
+ 
+     ! inform Smarties about the size of the state and the number of actions it can take
+-    call smarties_setStateActionDims(smarties_comm, STATE_SIZE, NUM_ACTIONS, AGENT_ID)
++    call smarties_setStateActionDims(smarties_comm, STATE_SIZE, NUM_ACTIONS,0)
+   
+     ! OPTIONAL: aciton bounds
+     bounded = .true.
+diff --git a/bin/smarties.py b/bin/smarties.py
+index e43fc10..71c401e 100755
+--- a/bin/smarties.py
++++ b/bin/smarties.py
+@@ -143,8 +143,10 @@ def setComputationalResources(parsed):
+   if parsed.nLearners < 1 and parsed.nProcesses > 1:
+     parsed.nLearners = 1
+     parsed.mpiProcsPerEnv = 1
++    print('set1',flush=True)
+ 
+   if parsed.mpiProcsPerEnv == 0: # 'forkable' applications
++    print('set2',flush=True)
+     # at least one learner process:
+     if parsed.nProcesses < 1: parsed.nProcesses = max(1, parsed.nLearners)
+     # surely now nProcesses is number of mpi processes
+@@ -161,13 +163,15 @@ def setComputationalResources(parsed):
+     if parsed.nEnvironments == 0: parsed.nEnvironments = parsed.nLearners
+ 
+   else:
++    print('set3',flush=True)
+     if parsed.nLearners < 1: parsed.nLearners = 1
+     if parsed.nEnvironments < 1: parsed.nEnvironments = 1
+     minNprocs = parsed.nLearners + parsed.nEnvironments * parsed.mpiProcsPerEnv
++    #minNprocs = parsed.nEnvironments * parsed.mpiProcsPerEnv
+     if parsed.nProcesses < minNprocs: parsed.nProcesses = minNprocs
+ 
+     # by default, maximize number of env processes:
+-    parsed.nEnvironments = (parsed.nProcesses - parsed.nLearners) / parsed.mpiProcsPerEnv
++    #parsed.nEnvironments = (parsed.nProcesses - parsed.nLearners) / parsed.mpiProcsPerEnv
+ 
+   parsed.args += " --nEnvironments %d --nMasters %d --nThreads %d" \
+                  " --workerProcessesPerEnv %d " % (parsed.nEnvironments, \
+@@ -396,34 +400,47 @@ if __name__ == '__main__':
+   parsed = parser.parse_args()
+ 
+   if parsed.runname is not None:
++    print('yes',flush = True)
+     relRunPath = parsed.runprefix + '/' + parsed.runname
+   else:
+     relRunPath = './'
+   # rundir overwriting is allowed (exist_ok could be parsed.isTraining==False):
++
++  print('relRunPath',relRunPath, flush = True)
++
+   os.makedirs(relRunPath, exist_ok=True)
+ 
+   absRunPath = os.path.abspath(relRunPath)
+   os.environ['RUNDIR'] = absRunPath
+ 
++  print('parsed.settings',parsed.settings,absRunPath,flush = True)
+   copySettingsFiles(parsed.settings, absRunPath)
+   # dir created, copy executable and read any problem-specific setup options:
++  print('parsed',parsed,flush = True)
+   applicationSetup(parsed, absRunPath)
++  print('application setup',flush=True)
+   # once application is defined, we can figure out all computational resouces:
+   setComputationalResources(parsed)
++  print('computational ressource',flush=True)
+   # define how many training steps, evaluation episodes, where/if to find restart
+   setTrainOrEvaluate(parsed)
++  print('train or evaluate',flush=True)
++  print('nprocess',parsed.nProcesses,flush=True)
+ 
+   subprocess.run("cd ${SMARTIES_ROOT} && git log | head > ${RUNDIR}/gitlog.log", \
+                  executable=parsed.shell, shell=True)
+   subprocess.run("cd ${SMARTIES_ROOT} && git diff       > ${RUNDIR}/gitdiff.log", \
+                  executable=parsed.shell, shell=True)
+-
++  print('parsed.execname',parsed.runname,relRunPath, absRunPath+'/'+parsed.execname,\
++         flush = True)
+   assert is_exe(absRunPath+'/'+parsed.execname), "FATAL: application not found"
+ 
+   cmd = 'cd ${RUNDIR} \n'
+   cmd = cmd + setEnvironmentFlags(parsed)
+   cmd = cmd + setLaunchCommand(parsed, absRunPath)
+ 
+-  # print('COMMAND:' + cmd )
++  print('COMMAND:', cmd ,flush=True)
+   signal.signal(signal.SIGINT, signal_handler)
++  print('signal',flush=True)
+   subprocess.run(cmd, executable=parsed.shell, shell=True)
++
+diff --git a/include/smarties.f90 b/include/smarties.f90
+index 9c2a216..41dbd5b 100644
+--- a/include/smarties.f90
++++ b/include/smarties.f90
+@@ -1,314 +1,314 @@
+-!==============================================================================
+-!
+-! smarties.f90
+-!
+-! This module, usable by any Fortran code with 'use smarties' in the preamble,
+-! defines the interfaces to the C/C++ functions, which are located in
+-! 'source/smarties_extern.cpp'.
+-!
+-! Interfaces can also be created for functions that take different kinds of
+-! variables (with the same name) as arguments.  Two interfaces of this kind are
+-! implemented for 'smarties_set_action_scales' and
+-! 'smarties_set_action_options'.  Take a look at these as examples if you need
+-! to create more.
+-!
+-! *****************************************************************************
+-! ********** There should be no need to modify any of the functions ***********
+-! **** If any of the following is edited, the corresponding C/C++ function ****
+-! *** located in 'source/smarties_extern.cpp' should be edited accordingly ****
+-! *****************************************************************************
+-!
+-!
+-! Copyright (c) 2019 CSE-Lab, ETH Zurich, Switzerland. All rights reserved.
+-! Distributed under the terms of the MIT license.
+-!
+-!==============================================================================
+-
+-module smarties
+-
+-  implicit none
+-
+-  interface
+-    subroutine smarties_sendInitState( &
+-        ptr2comm, state, state_dim, agentID) &
+-        bind(c, name='smarties_sendInitState')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: state
+-      integer(c_int), intent(in), value :: state_dim
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_sendInitState
+-  end interface
+-
+-  interface
+-    subroutine smarties_sendState( &
+-        ptr2comm, state, state_dim, reward, agentID) &
+-        bind(c, name='smarties_sendState')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: state
+-      integer(c_int), intent(in), value :: state_dim
+-      real(c_double), intent(in), value :: reward
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_sendState
+-  end interface
+-
+-  interface
+-    subroutine smarties_sendTermState( &
+-        ptr2comm, state, state_dim, reward, agentID) &
+-        bind(c, name='smarties_sendTermState')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: state
+-      integer(c_int), intent(in), value :: state_dim
+-      real(c_double), intent(in), value :: reward
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_sendTermState
+-  end interface
+-
+-  interface
+-    subroutine smarties_sendLastState( &
+-        ptr2comm, state, state_dim, reward, agentID) &
+-        bind(c, name='smarties_sendLastState')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: state
+-      integer(c_int), intent(in), value :: state_dim
+-      real(c_double), intent(in), value :: reward
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_sendLastState
+-  end interface
+-
+-  interface
+-    subroutine smarties_recvAction( &
+-        ptr2comm, action, action_dim, agentID) &
+-        bind(c, name='smarties_recvAction')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: action
+-      integer(c_int), intent(in), value :: action_dim
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_recvAction
+-  end interface
+-
+-  interface
+-    subroutine smarties_setNumAgents( &
+-        ptr2comm, num_agents) &
+-        bind(c, name='smarties_setNumAgents')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), value :: num_agents
+-    end subroutine smarties_setNumAgents
+-  end interface
+-
+-  interface
+-    subroutine smarties_setStateActionDims( &
+-        ptr2comm, state_dim, action_dim, agentID) &
+-        bind(c, name='smarties_setStateActionDims')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), value :: state_dim
+-      integer(c_int), intent(in), value :: action_dim
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setStateActionDims
+-  end interface
+-
+-
+-  interface
+-    subroutine smarties_setActionScales( &
+-        ptr2comm, upper_act_bound, lower_act_bound, &
+-        bounded, action_dim, agentID) &
+-        bind(c, name='smarties_setActionScales')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),     intent(in), value :: ptr2comm
+-      type(c_ptr),     intent(in), value :: upper_act_bound
+-      type(c_ptr),     intent(in), value :: lower_act_bound
+-      logical(c_bool), intent(in), value :: bounded
+-      integer(c_int),  intent(in), value :: action_dim
+-      integer(c_int),  intent(in), optional :: agentID
+-    end subroutine smarties_setActionScales
+-  end interface
+-
+-  interface
+-    subroutine smarties_setActionScalesBounds( &
+-        ptr2comm, upper_act_bound, lower_act_bound, &
+-        bounded, action_dim, agentID) &
+-        bind(c, name='smarties_setActionScalesBounds')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),     intent(in), value :: ptr2comm
+-      type(c_ptr),     intent(in), value :: upper_act_bound
+-      type(c_ptr),     intent(in), value :: lower_act_bound
+-      type(c_ptr),     intent(in), value :: bounded
+-      integer(c_int),  intent(in), value :: action_dim
+-      integer(c_int),  intent(in), optional :: agentID
+-    end subroutine smarties_setActionScalesBounds
+-  end interface
+-
+-
+-  interface
+-    subroutine smarties_setActionOptions( &
+-        ptr2comm, num_options, agentID) &
+-        bind(c, name='smarties_setActionOptions')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),     intent(in), value :: ptr2comm
+-      integer(c_int),  intent(in), value :: num_options
+-      integer(c_int),  intent(in), optional :: agentID
+-    end subroutine smarties_setActionOptions
+-  end interface
+-
+-  interface
+-    subroutine smarties_setActionOptionsPerDim( &
+-        ptr2comm, num_options, action_dim, agentID) &
+-        bind(c, name='smarties_setActionOptionsPerDim')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),     intent(in), value :: ptr2comm
+-      type(c_ptr),     intent(in), value :: num_options
+-      integer(c_int),  intent(in), value :: action_dim
+-      integer(c_int),  intent(in), optional :: agentID
+-    end subroutine smarties_setActionOptionsPerDim
+-  end interface
+-
+-  interface
+-    subroutine smarties_setStateObservable( &
+-        ptr2comm, b_observable, state_dim, agentID) &
+-        bind(c, name='smarties_setStateObservable')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: b_observable
+-      integer(c_int), intent(in), value :: state_dim
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setStateObservable
+-  end interface
+-
+-  interface
+-    subroutine smarties_setStateScales( &
+-        ptr2comm, upper_state_bound, lower_state_bound, state_dim, agentID) &
+-        bind(c, name='smarties_setStateScales')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      type(c_ptr),    intent(in), value :: upper_state_bound
+-      type(c_ptr),    intent(in), value :: lower_state_bound
+-      integer(c_int), intent(in), value :: state_dim
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setStateScales
+-  end interface
+-
+-  interface
+-    subroutine smarties_setIsPartiallyObservable(ptr2comm, agentID) &
+-        bind(c, name='smarties_setIsPartiallyObservable')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setIsPartiallyObservable
+-  end interface
+-
+-  interface
+-    subroutine smarties_finalizeProblemDescription(ptr2comm) &
+-        bind(c, name='smarties_finalizeProblemDescription')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-    end subroutine smarties_finalizeProblemDescription
+-  end interface
+-
+-  interface
+-    subroutine smarties_envHasDistributedAgents(ptr2comm) &
+-        bind(c, name='smarties_envHasDistributedAgents')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-    end subroutine smarties_envHasDistributedAgents
+-  end interface
+-
+-  interface
+-    subroutine smarties_agentsDefineDifferentMDP(ptr2comm) &
+-        bind(c, name='smarties_agentsDefineDifferentMDP')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-    end subroutine smarties_agentsDefineDifferentMDP
+-  end interface
+-
+-  interface
+-    subroutine smarties_disableDataTrackingForAgents( &
+-        ptr2comm, agentStart, agentEnd) &
+-        bind(c, name='smarties_disableDataTrackingForAgents')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), value :: agentStart
+-      integer(c_int), intent(in), value :: agentEnd
+-    end subroutine smarties_disableDataTrackingForAgents
+-  end interface
+-
+-  interface
+-    subroutine smarties_setPreprocessingConv2d( &
+-        ptr2comm, input_width, input_height, input_features, &
+-        kernels_num, filters_size, stride, agentID) &
+-        bind(c, name='smarties_setPreprocessingConv2d')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), value :: input_width
+-      integer(c_int), intent(in), value :: input_height
+-      integer(c_int), intent(in), value :: input_features
+-      integer(c_int), intent(in), value :: kernels_num
+-      integer(c_int), intent(in), value :: filters_size
+-      integer(c_int), intent(in), value :: stride
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setPreprocessingConv2d
+-  end interface
+-
+-  interface
+-    subroutine smarties_setNumAppendedPastObservations( &
+-        ptr2comm, n_appended, agentID) &
+-        bind(c, name='smarties_setNumAppendedPastObservations')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in), value :: ptr2comm
+-      integer(c_int), intent(in), value :: n_appended
+-      integer(c_int), intent(in), optional :: agentID
+-    end subroutine smarties_setNumAppendedPastObservations
+-  end interface
+-
+-  interface
+-    subroutine smarties_getUniformRandom( &
+-        ptr2comm, range_begin, range_end, sampled) &
+-        bind(c, name='smarties_getUniformRandom')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in),  value    :: ptr2comm
+-      real(c_double), intent(in),  optional :: range_begin
+-      real(c_double), intent(in),  optional :: range_end
+-      real(c_double), intent(out), optional :: sampled(*)
+-    end subroutine smarties_getUniformRandom
+-  end interface
+-
+-  interface
+-    subroutine smarties_getNormalRandom( &
+-        ptr2comm, mean, stdev, sampled) &
+-        bind(c, name='smarties_getNormalRandom')
+-      use, intrinsic :: iso_c_binding
+-      implicit none
+-      type(c_ptr),    intent(in),  value    :: ptr2comm
+-      real(c_double), intent(in),  optional :: mean
+-      real(c_double), intent(in),  optional :: stdev
+-      real(c_double), intent(out), optional :: sampled(*)
+-    end subroutine smarties_getNormalRandom
+-  end interface
+-
+-end module smarties
++!==============================================================================
++!
++! smarties.f90
++!
++! This module, usable by any Fortran code with 'use smarties' in the preamble,
++! defines the interfaces to the C/C++ functions, which are located in
++! 'source/smarties_extern.cpp'.
++!
++! Interfaces can also be created for functions that take different kinds of
++! variables (with the same name) as arguments.  Two interfaces of this kind are
++! implemented for 'smarties_set_action_scales' and
++! 'smarties_set_action_options'.  Take a look at these as examples if you need
++! to create more.
++!
++! *****************************************************************************
++! ********** There should be no need to modify any of the functions ***********
++! **** If any of the following is edited, the corresponding C/C++ function ****
++! *** located in 'source/smarties_extern.cpp' should be edited accordingly ****
++! *****************************************************************************
++!
++!
++! Copyright (c) 2019 CSE-Lab, ETH Zurich, Switzerland. All rights reserved.
++! Distributed under the terms of the MIT license.
++!
++!==============================================================================
++
++module smarties
++
++  implicit none
++
++  interface
++    subroutine smarties_sendInitState( &
++        ptr2comm, state, state_dim, agentID) &
++        bind(c, name='smarties_sendInitState')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: state
++      integer(c_int), intent(in), value :: state_dim
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_sendInitState
++  end interface
++
++  interface
++    subroutine smarties_sendState( &
++        ptr2comm, state, state_dim, reward, agentID) &
++        bind(c, name='smarties_sendState')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: state
++      integer(c_int), intent(in), value :: state_dim
++      real(c_double), intent(in), value :: reward
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_sendState
++  end interface
++
++  interface
++    subroutine smarties_sendTermState( &
++        ptr2comm, state, state_dim, reward, agentID) &
++        bind(c, name='smarties_sendTermState')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: state
++      integer(c_int), intent(in), value :: state_dim
++      real(c_double), intent(in), value :: reward
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_sendTermState
++  end interface
++
++  interface
++    subroutine smarties_sendLastState( &
++        ptr2comm, state, state_dim, reward, agentID) &
++        bind(c, name='smarties_sendLastState')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: state
++      integer(c_int), intent(in), value :: state_dim
++      real(c_double), intent(in), value :: reward
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_sendLastState
++  end interface
++
++  interface
++    subroutine smarties_recvAction( &
++        ptr2comm, action, action_dim, agentID) &
++        bind(c, name='smarties_recvAction')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: action
++      integer(c_int), intent(in), value :: action_dim
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_recvAction
++  end interface
++
++  interface
++    subroutine smarties_setNumAgents( &
++        ptr2comm, num_agents) &
++        bind(c, name='smarties_setNumAgents')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: num_agents
++    end subroutine smarties_setNumAgents
++  end interface
++
++  interface
++    subroutine smarties_setStateActionDims( &
++        ptr2comm, state_dim, action_dim, agentID) &
++        bind(c, name='smarties_setStateActionDims')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: state_dim
++      integer(c_int), intent(in), value :: action_dim
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setStateActionDims
++  end interface
++
++
++  interface
++    subroutine smarties_setActionScales( &
++        ptr2comm, upper_act_bound, lower_act_bound, &
++        bounded, action_dim, agentID) &
++        bind(c, name='smarties_setActionScales')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),     intent(in), value :: ptr2comm
++      type(c_ptr),     intent(in), value :: upper_act_bound
++      type(c_ptr),     intent(in), value :: lower_act_bound
++      logical(c_bool), intent(in), value :: bounded
++      integer(c_int),  intent(in), value :: action_dim
++      integer(c_int),  intent(in), value :: agentID
++    end subroutine smarties_setActionScales
++  end interface
++
++  interface
++    subroutine smarties_setActionScalesBounds( &
++        ptr2comm, upper_act_bound, lower_act_bound, &
++        bounded, action_dim, agentID) &
++        bind(c, name='smarties_setActionScalesBounds')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),     intent(in), value :: ptr2comm
++      type(c_ptr),     intent(in), value :: upper_act_bound
++      type(c_ptr),     intent(in), value :: lower_act_bound
++      type(c_ptr),     intent(in), value :: bounded
++      integer(c_int),  intent(in), value :: action_dim
++      integer(c_int),  intent(in), value :: agentID
++    end subroutine smarties_setActionScalesBounds
++  end interface
++
++
++  interface
++    subroutine smarties_setActionOptions( &
++        ptr2comm, num_options, agentID) &
++        bind(c, name='smarties_setActionOptions')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),     intent(in), value :: ptr2comm
++      integer(c_int),  intent(in), value :: num_options
++      integer(c_int),  intent(in), value :: agentID
++    end subroutine smarties_setActionOptions
++  end interface
++
++  interface
++    subroutine smarties_setActionOptionsPerDim( &
++        ptr2comm, num_options, action_dim, agentID) &
++        bind(c, name='smarties_setActionOptionsPerDim')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),     intent(in), value :: ptr2comm
++      type(c_ptr),     intent(in), value :: num_options
++      integer(c_int),  intent(in), value :: action_dim
++      integer(c_int),  intent(in), value :: agentID
++    end subroutine smarties_setActionOptionsPerDim
++  end interface
++
++  interface
++    subroutine smarties_setStateObservable( &
++        ptr2comm, b_observable, state_dim, agentID) &
++        bind(c, name='smarties_setStateObservable')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: b_observable
++      integer(c_int), intent(in), value :: state_dim
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setStateObservable
++  end interface
++
++  interface
++    subroutine smarties_setStateScales( &
++        ptr2comm, upper_state_bound, lower_state_bound, state_dim, agentID) &
++        bind(c, name='smarties_setStateScales')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      type(c_ptr),    intent(in), value :: upper_state_bound
++      type(c_ptr),    intent(in), value :: lower_state_bound
++      integer(c_int), intent(in), value :: state_dim
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setStateScales
++  end interface
++
++  interface
++    subroutine smarties_setIsPartiallyObservable(ptr2comm, agentID) &
++        bind(c, name='smarties_setIsPartiallyObservable')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setIsPartiallyObservable
++  end interface
++
++  interface
++    subroutine smarties_finalizeProblemDescription(ptr2comm) &
++        bind(c, name='smarties_finalizeProblemDescription')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++    end subroutine smarties_finalizeProblemDescription
++  end interface
++
++  interface
++    subroutine smarties_envHasDistributedAgents(ptr2comm) &
++        bind(c, name='smarties_envHasDistributedAgents')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++    end subroutine smarties_envHasDistributedAgents
++  end interface
++
++  interface
++    subroutine smarties_agentsDefineDifferentMDP(ptr2comm) &
++        bind(c, name='smarties_agentsDefineDifferentMDP')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++    end subroutine smarties_agentsDefineDifferentMDP
++  end interface
++
++  interface
++    subroutine smarties_disableDataTrackingForAgents( &
++        ptr2comm, agentStart, agentEnd) &
++        bind(c, name='smarties_disableDataTrackingForAgents')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: agentStart
++      integer(c_int), intent(in), value :: agentEnd
++    end subroutine smarties_disableDataTrackingForAgents
++  end interface
++
++  interface
++    subroutine smarties_setPreprocessingConv2d( &
++        ptr2comm, input_width, input_height, input_features, &
++        kernels_num, filters_size, stride, agentID) &
++        bind(c, name='smarties_setPreprocessingConv2d')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: input_width
++      integer(c_int), intent(in), value :: input_height
++      integer(c_int), intent(in), value :: input_features
++      integer(c_int), intent(in), value :: kernels_num
++      integer(c_int), intent(in), value :: filters_size
++      integer(c_int), intent(in), value :: stride
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setPreprocessingConv2d
++  end interface
++
++  interface
++    subroutine smarties_setNumAppendedPastObservations( &
++        ptr2comm, n_appended, agentID) &
++        bind(c, name='smarties_setNumAppendedPastObservations')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in), value :: ptr2comm
++      integer(c_int), intent(in), value :: n_appended
++      integer(c_int), intent(in), value :: agentID
++    end subroutine smarties_setNumAppendedPastObservations
++  end interface
++
++  interface
++    subroutine smarties_getUniformRandom( &
++        ptr2comm, range_begin, range_end, sampled) &
++        bind(c, name='smarties_getUniformRandom')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in),  value    :: ptr2comm
++      real(c_double), intent(in),  value    :: range_begin
++      real(c_double), intent(in),  value    :: range_end
++      real(c_double), intent(out)    :: sampled(*)
++    end subroutine smarties_getUniformRandom
++  end interface
++
++  interface
++    subroutine smarties_getNormalRandom( &
++        ptr2comm, mean, stdev, sampled) &
++        bind(c, name='smarties_getNormalRandom')
++      use, intrinsic :: iso_c_binding
++      implicit none
++      type(c_ptr),    intent(in),  value    :: ptr2comm
++      real(c_double), intent(in),  value    :: mean
++      real(c_double), intent(in),  value    :: stdev
++      real(c_double), intent(out)    :: sampled(*)
++    end subroutine smarties_getNormalRandom
++  end interface
++
++end module smarties
+diff --git a/include/smarties_extern.h b/include/smarties_extern.h
+index cb0b1e5..50e13ae 100644
+--- a/include/smarties_extern.h
++++ b/include/smarties_extern.h
+@@ -1,7 +1,7 @@
+ #ifndef smarties_extern_h
+ #define smarties_extern_h
+ 
+-#include "../source/smarties/Communicator.h"
++#include "/home/aurelien.vadrot/TOOLS/smarties/source/smarties/Communicator.h"
+ 
+ //==============================================================================
+ //
+diff --git a/install_dependencies.sh b/install_dependencies.sh
+index 7ebcbb6..bb93a4b 100755
+--- a/install_dependencies.sh
++++ b/install_dependencies.sh
+@@ -12,6 +12,8 @@ SOURCES=${SMARTIES_ROOT}/extern
+ INSTALL_PATH=${SMARTIES_ROOT}/extern/
+ CC=${CC:-gcc}
+ CXX=${CXX:-g++}
++FC=${FC:-gfortran}
++FFLAGS=${FFLAGS:--fallow-argument-mismatch}
+ # Shorthands for versions.
+ # NOTE: Changing these numbers may not be enough for the script to work properly!
+ 
+@@ -76,8 +78,8 @@ if [ -n "$INSTALL_MPICH" ]; then
+     $TAR -xzvf mpich-${MPICH_VERSION}.tar.gz
+     rm mpich-${MPICH_VERSION}.tar.gz
+     cd mpich-${MPICH_VERSION}
+-    CC=${CC} CXX=${CXX} ./configure --prefix=$INSTALL_PATH/ \
+-      --enable-fast=all --enable-fortran=no --enable-threads=multiple
++    CC=${CC} CXX=${CXX} FC=${FC} FFLAGS=${FFLAGS} ./configure --prefix=$INSTALL_PATH/ \
++      --enable-fast=all --enable-threads=multiple
+     make -j${JOBS}
+     make install -j${JOBS}
+     cd $BASEPWD
+diff --git a/settings/VRACER.json b/settings/VRACER.json
+index c17df2f..3154445 100755
+--- a/settings/VRACER.json
++++ b/settings/VRACER.json
+@@ -1,7 +1,29 @@
+ {
+   "learner": "VRACER",
+-  "dataSamplingAlgo": "uniform",
+-  "returnsEstimator": "retrace",
+   "ERoldSeqFilter": "oldest",
+-  "nnLayerSizes": [128, 128]
++  "returnsEstimator": "retrace",
++  "ESpopSize": 1,
++  "batchSize": 256,
++  "maxTotObsNum": 10000,
++  "minTotObsNum": 0,
++  "clipImpWeight": 4,
++  "dataSamplingAlgo": "uniform",
++  "encoderLayerSizes": [0],
++  "epsAnneal": 0,
++  "explNoise": 0.4472135955,
++  "gamma": 0.995,
++  "klDivConstraint": 0.01,
++  "lambda": 0.95,
++  "learnrate": 0.0001,
++  "nnBPTTseq": 16,
++  "nnFunc": "SoftSign",
++  "nnLambda": 0,
++  "nnLayerSizes": [5, 5],
++  "nnOutputFunc": "Linear",
++  "nnType": "RNN",
++  "obsPerStep": 1,
++  "outWeightsPrefac": 0.1,
++  "penalTol": 0.1,
++  "saveFreq": 200,
++  "targetDelay": 0
+ }
+diff --git a/source/smarties/Communicator.cpp b/source/smarties/Communicator.cpp
+index 08d9747..65189bc 100644
+--- a/source/smarties/Communicator.cpp
++++ b/source/smarties/Communicator.cpp
+@@ -255,19 +255,30 @@ void Communicator::finalizeProblemDescription()
+ void Communicator::_sendState(const int agentID, const episodeStatus status,
+     const std::vector<double>& state, const double reward)
+ {
++  //printf("Communicator.cpp sendState 1");
++  //fflush(stdout);
++  //if( not ENV.bFinalized ) printf("sendState 1 bis"); // race condition
++  //if( not ENV.bFinalized ) fflush(stdout); // race condition
+   if( not ENV.bFinalized ) synchronizeEnvironments(); // race condition
+   if(bTrainIsOver)
+     die("App recvd end-of-training signal but did not abort on it's own.");
+ 
++  //printf("sendState 2");
++  //fflush(stdout);
++
+   //const auto& MDP = ENV.getDescriptor(agentID);
+   assert(agentID>=0 && (Uint) agentID < agents.size());
+   assert(agents[agentID]->localID == (unsigned) agentID);
+   assert(agents[agentID]->ID == (unsigned) agentID);
+   agents[agentID]->update(status, state, reward);
+-  #ifndef NDEBUG
+-    if (agents[agentID]->stateIsInvalid())
+-      die("Environment gave a nan or inf state or reward.");
+-  #endif
++
++  //printf("sendState 3");
++  //fflush(stdout);
++
++  //#ifndef NDEBUG
++  if (agents[agentID]->stateIsInvalid())
++    die("Environment gave a nan or inf state or reward.");
++  //#endif
+ 
+   if(SOCK.server == -1)
+   {
+@@ -316,8 +327,12 @@ void Communicator::synchronizeEnvironments()
+ 
+   if(SOCK.server == -1)
+   {
++    //printf("synchronize env A");
++    //fflush(stdout);
+     assert(worker not_eq nullptr);
++
+     worker->synchronizeEnvironments();
++
+   }
+   else
+   {
+diff --git a/source/smarties/Core/Worker.cpp b/source/smarties/Core/Worker.cpp
+index 410e269..6b11464 100644
+--- a/source/smarties/Core/Worker.cpp
++++ b/source/smarties/Core/Worker.cpp
+@@ -73,10 +73,12 @@ void Worker::runTraining()
+       if(nCollected >= minNdataB4Train) {
+         isTrainingStarted = 1;
+         printf("\rCollected all data required to begin training.     \n");
++	printf("\risTrainingStarted : %d    \n",isTrainingStarted);
+         fflush(0);
+       } else if(perc >= percentageReady+5) {
+         percentageReady = perc;
+-        printf("\rCollected %d%% of data required to begin training. ", perc);
++      //  printf("\rCollected %d%% of data required to begin training. ", perc);
++        printf("minNdatab4train %ld and %ld and %d and %ld \n",minNdataB4Train,nCollected,perc,learners.size());
+         fflush(0);
+       }
+     }
+diff --git a/source/smarties/Learners/Learner.cpp b/source/smarties/Learners/Learner.cpp
+index 3d571b7..10007bb 100644
+--- a/source/smarties/Learners/Learner.cpp
++++ b/source/smarties/Learners/Learner.cpp
+@@ -59,7 +59,6 @@ void Learner::initializeLearner()
+   MemoryProcessing::updateRewardsStats(* data.get(), true);
+   // shift counters after initial data is gathered and sync is concluded
+   data->counters.nGatheredB4Startup = nObsB4StartTraining;
+-
+   data->updateSampler();
+   // Rewards second moment is computed right before actual training begins
+   // therefore we need to recompute (rescaled) Retrace/GAE values for all
+diff --git a/source/smarties/Learners/RACER_common.cpp b/source/smarties/Learners/RACER_common.cpp
+index 2029770..fca21aa 100644
+--- a/source/smarties/Learners/RACER_common.cpp
++++ b/source/smarties/Learners/RACER_common.cpp
+@@ -91,6 +91,8 @@ void RACER<Advantage_t, Policy_t, Action_t>::setupNet()
+   networks[0]->buildFromSettings(nouts);
+   Builder& networkBuilder = networks[0]->getBuilder();
+ 
++  printf("iscontinuous %d \n",isContinuous);  
++
+   if(isContinuous)
+   {
+     Rvec  biases = Rvec(1, 0);
+diff --git a/source/smarties/Network/Approximator.cpp b/source/smarties/Network/Approximator.cpp
+index d609ea8..4a8092e 100644
+--- a/source/smarties/Network/Approximator.cpp
++++ b/source/smarties/Network/Approximator.cpp
+@@ -212,6 +212,7 @@ void Approximator::buildFromSettings(const std::vector<Uint> outputSizes)
+     if(inputSize == 0) {
+       warn("network with no input space. will return a param layer");
+       build->addParamLayer(nOuts, outFuncType, std::vector<Real>(nOuts, 0));
++      printf("Network/Approximator.cpp", nOuts);
+       return;
+     } else
+       build->addInput(inputSize);
+diff --git a/source/smarties/ReplayMemory/MemoryBuffer.cpp b/source/smarties/ReplayMemory/MemoryBuffer.cpp
+index f7d0b58..c14e43a 100644
+--- a/source/smarties/ReplayMemory/MemoryBuffer.cpp
++++ b/source/smarties/ReplayMemory/MemoryBuffer.cpp
+@@ -564,6 +564,8 @@ void MemoryBuffer::getMetrics(std::ostringstream& buff)
+ void MemoryBuffer::getHeaders(std::ostringstream& buff)
+ {
+   buff << "|  avgR  | avgr | stdr | DKL ";
++  printf("\rReplaymemory/MemoryBuffer maxQ %f ",stats.maxQ);
++  printf("\rReplaymemory/MemoryBuffer minQ %f ",stats.minQ);
+   if( stats.minQ < stats.maxQ ) { // else Q stats not collected
+     if(stats.countReturnsEstimateUpdates>=0)
+          buff << "| RMSE |maxErr| dRet | stdQ | avgQ | minQ | maxQ ";
+diff --git a/source/smarties/ReplayMemory/MemoryBuffer.h b/source/smarties/ReplayMemory/MemoryBuffer.h
+index b4247ec..726afcf 100644
+--- a/source/smarties/ReplayMemory/MemoryBuffer.h
++++ b/source/smarties/ReplayMemory/MemoryBuffer.h
+@@ -37,6 +37,7 @@ struct MemoryBuffer
+   const ActionInfo aI = ActionInfo(MDP);
+   Uint learnID = 0;
+ 
++
+   // if clipImpWeight==0 do naive Exp Replay==0 do naive Exp Replay:
+   Real beta = settings.clipImpWeight <= 0 ? 1 : 1e-4;
+   Real alpha = 0.5; // UNUSED: weight between critic and policy used for CMA
+@@ -80,6 +81,7 @@ struct MemoryBuffer
+ 
+   void initialize();
+ 
++
+   void clearAll();
+   Uint clearOffPol(const Real C, const Real tol);
+ 
+diff --git a/source/smarties/Settings/ExecutionInfo.cpp b/source/smarties/Settings/ExecutionInfo.cpp
+index 242746d..d9b7a0e 100644
+--- a/source/smarties/Settings/ExecutionInfo.cpp
++++ b/source/smarties/Settings/ExecutionInfo.cpp
+@@ -165,6 +165,8 @@ int ExecutionInfo::parse()
+     }
+     else return 1;
+   }
++  printf("%d\n",learnersOnWorkers);
++  fflush(stdout);
+   MPI_Barrier(world_comm);
+   return 0;
+ }
+@@ -229,7 +231,7 @@ void ExecutionInfo::figureOutWorkersPattern()
+   if(    forkableApplication && not bThereAreWorkerProcesses) {
+     // then master forks all requested environments
+     if(world_rank == 0)
+-      printf("Master processes to communicate via sockets.");
++      printf("Master processes to communicate via sockets:");
+   }
+   if(    forkableApplication &&     bThereAreWorkerProcesses) {
+     // then workers split amongs them forking environment processes
+diff --git a/source/smarties/Settings/HyperParameters.cpp b/source/smarties/Settings/HyperParameters.cpp
+index 6b70b42..f428a44 100644
+--- a/source/smarties/Settings/HyperParameters.cpp
++++ b/source/smarties/Settings/HyperParameters.cpp
+@@ -192,6 +192,8 @@ void HyperParameters::defineDistributedLearning(ExecutionInfo& distrib)
+   minTotObsNum = std::min(minTotObsNum, maxTotObsNum); 
+   minTotObsNum = std::ceil(minTotObsNum / nL) * nL;
+   minTotObsNum_local = minTotObsNum / nLearners;
++  printf("\rSettings/Hyperparameters %ld%% minTot", minTotObsNum);
++  printf("\rSettings/Hyperparameters %ld%% minTot local", minTotObsNum_local);
+   // each learner processes a fraction of the entire dataset:
+   maxTotObsNum = std::ceil(maxTotObsNum / nL) * nL;
+   maxTotObsNum_local = maxTotObsNum / nLearners;
+diff --git a/source/smarties/smarties_extern.cpp b/source/smarties/smarties_extern.cpp
+index 8ff62e4..a391171 100644
+--- a/source/smarties/smarties_extern.cpp
++++ b/source/smarties/smarties_extern.cpp
+@@ -19,12 +19,14 @@
+ 
+ 
+ //=============================================================================
+-#include "../../include/smarties_extern.h"
++#include "/home/aurelien.vadrot/TOOLS/smarties/include/smarties_extern.h"
+ 
+ //=============================================================================
+ extern "C" void smarties_sendInitState(void*const ptr2comm,
+   const double*const S, const int state_dim, const int agentID)
+ {
++  printf("C++ sendInitstate",ptr2comm,",",S,",",state_dim,",",agentID);
++  fflush(stdout);
+   const std::vector<double> svec(S, S + state_dim);
+   static_cast<smarties::Communicator*>(ptr2comm)->sendInitState(svec, agentID);
+ }
+@@ -64,6 +66,7 @@ extern "C" void smarties_recvAction(void*const ptr2comm,
+ extern "C" void smarties_setNumAgents(void*const ptr2comm,
+   const int num_agents)
+ {
++  printf("C++ setNumAgents");
+   static_cast<smarties::Communicator*>(ptr2comm)->setNumAgents(num_agents);
+ }
+ 

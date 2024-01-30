@@ -1,0 +1,26 @@
+#!/bin/bash
+
+sbatch runfile_exec
+sed -i 's/180/1e3/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/1e3/2e3/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/2e3/5e3/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/5e3/1e4/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/1e4/1e5/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/1e5/1e6/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/1e6/1e7/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/1e7/1e8/g' runfile_exec
+sbatch runfile_exec
+sed -i 's/1e8/1e9/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/1e9/1e10/g' runfile_exec
+#sbatch runfile_exec
+sed -i 's/1e10/180/g' runfile_exec
+
+

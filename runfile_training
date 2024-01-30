@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#SBATCH -J L1SUN
+#SBATCH --ntasks=17
+##SBATCH --ntasks=25
+##SBATCH --ntasks=13
+#SBATCH --time=14-00:00:00
+#SBATCH --partition=q64,q36
+##SBATCH --exclusive
+#SBATCH --exclude=s06n04
+#SBATCH --mem=250000
+
+cd $SLURM_SUBMIT_DIR
+
+module purge
+module load gcc/11.1.0
+module load cmake/3.20.2
+module load mpich/3.3.0
+
+source /home/aurelien.vadrot/TOOLS/miniconda3/etc/profile.d/conda.sh
+conda activate env_smarties
+export CC=`which gcc`
+export CXX=`which g++`
+
+#module load intel
+#module load openmpi/intel-2019.0/4.0.3
+#£module load openmpi/gnu/4.0.3
+
+export dir='apps/Nz_48/Nagents_256/AMD/Re1e5'
+export app='Nz_48/Nagents_256/AMD/Re1e5'
+export run='runs/Nz_48/Nagents_256/AMD/Re1e5'
+
+#rm -rf $dir/output/*.bin
+#rm -rf $dir/output/*.dat
+#rm -rf $dir/output/*.out
+#rm -rf $dir/output/GABLS3DATA
+#rm -rf $dir/output/actions_map.csv
+#rm -rf $dir/output/tauw*.csv
+#mkdir $dir/output/GABLS3DATA
+
+#rm -rf $dir/output
+#rm -rf $dir/input
+
+#cp -r /home/aurelien.vadrot/CFD_Codes/LES_CTRSP2022/Nz_48/Viscosity_on/XRWM/AMD/Re1e4/input $dir
+#cp -r /home/aurelien.vadrot/CFD_Codes/LES_CTRSP2022/Nz_48/Viscosity_on/XRWM/AMD/Re1e4/output $dir
+
+#rm -rf $dir/output/*.bin
+rm -rf $dir/output/*.dat
+rm -rf $dir/output/*.out
+rm -rf $dir/output/GABLS3DATA
+mkdir $dir/output/GABLS3DATA
+rm $dir/RL_init
+rm -r $run/*
+
+N_WORKERS=$((SLURM_NTASKS-1))
+
+# Run first continuing case
+smarties.py $app Bae_neq.json --nProcesses 1 --runname $app --nEnvironments 1 --mpiProcsPerEnv $N_WORKERS --nTaskPerNode $N_WORKERS --nThreads 1 --nTrainSteps 10000000 --nLearners 1 #--learnersOnWorkers false #--nProcesses 8 --nLearners 1
+#smarties.py cart_pole_py settings1.json --runname front_totobs100000 --nEvalEpisodes 100 --restart runs/front_totobs100000 #--nEnvironments 1 --mpiProcsPerEnv 8 --nTaskPerNode 8 --nThreads 1 --nTrainSteps 12000 ##--execname apps/LESGO_M/app_main
+

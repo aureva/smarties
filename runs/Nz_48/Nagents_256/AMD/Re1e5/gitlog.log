@@ -1,0 +1,10 @@
+commit 34c53d1ef03a324b20b418eaac6343ba44b6c966
+Author: Guido Novati <novatig@gmail.com>
+Date:   Mon Mar 1 19:00:13 2021 +0100
+
+    Tweaks to how numerical safety is preserved with squashed normal policy while allowing for long-term stability of the algorithm
+
+commit 8da846a42f5222021b30dc6080b010c33f461fad
+Author: Guido Novati <novatig@gmail.com>
+Date:   Thu Feb 25 20:58:36 2021 +0100
+

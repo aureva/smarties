@@ -1,0 +1,36 @@
+#!/bin/bash
+
+#SBATCH -J Vis_1e3
+#SBATCH --ntasks=9
+#SBATCH --time=24:00:00
+#SBATCH --partition=q64,q36,q32,q24
+#SBATCH --exclusive
+
+cd $SLURM_SUBMIT_DIR
+
+module purge
+module load gcc/11.1.0
+module load cmake/3.20.2
+module load mpich/3.3.0
+
+source /home/aurelien.vadrot/TOOLS/miniconda3/etc/profile.d/conda.sh
+conda activate env_smarties
+export CC=`which gcc`
+export CXX=`which g++`
+
+#module load intel
+#module load openmpi/intel-2019.0/4.0.3
+#£module load openmpi/gnu/4.0.3
+
+rm -rf output/*.bin
+rm -rf output/*.out
+rm -rf output/*.dat
+rm -rf output/GABLS3DATA
+mkdir output/GABLS3DATA
+#cp input/vel.ini input/vel.out
+#cp input/zo.ini input/zo.out
+
+
+# Run first continuing case
+mpirun -np 2 ./exec
+#./exec

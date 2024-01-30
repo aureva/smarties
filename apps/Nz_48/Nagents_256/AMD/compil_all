@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cd Re1e3
+./build-lesgo
+cd ..
+cd Re1e4
+./build-lesgo
+cd ..
+cd Re1e5
+./build-lesgo
+cd ..
+
