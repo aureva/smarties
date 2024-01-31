@@ -1,4 +1,6 @@
-# smarties coupled with LESGO
+# smarties
+#coupled with LESGO
+
 Reinforcement learning wall-model (RLWM) for large eddy simulation
 smarties library coupled with LESGO
 
