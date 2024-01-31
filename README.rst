@@ -1,5 +1,4 @@
-# smarties
-#coupled with LESGO
+### smarties coupled with LESGO
 
 Reinforcement learning wall-model (RLWM) for large eddy simulation
 smarties library coupled with LESGO
@@ -16,6 +15,7 @@ Vadrot, A., Yang, X. I., Bae, H. J., & Abkar, M. (2023). Log-law recovery throug
 CAREFUL: use runfile_training with care since it erases the existing weights and biases in the /runs folder if they exist.  
 
 -> To cite this repository, reference the paper:
+
 @article{vadrot2023log,
   title={Log-law recovery through reinforcement-learning wall model for large eddy simulation},
   author={Vadrot, Aur{\'e}lien and Yang, Xiang IA and Bae, H Jane and Abkar, Mahdi},
